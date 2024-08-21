@@ -30,6 +30,6 @@ print("INITIAL qpos", data.qpos)
 # Simulate and visualize
 for i in range(100):
     
-    data.qpos[:len(target_q)] = target_q
-    mujoco.mj_step(model, data)
-    viewer.render()
+  data.qpos[:len(target_q)] = target_q
+  mujoco.mj_step(model, data)
+  viewer.render()
