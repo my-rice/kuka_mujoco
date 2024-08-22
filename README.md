@@ -9,7 +9,4 @@ The Kuka Mujoco is a Python-based tool designed to visualize and analyze data ge
 
 ## Installation
 
-To install the necessary dependencies, you can use `pip`:
-
-```bash
-pip install -r requirements.txt
+The instructions will be provided soon.
