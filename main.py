@@ -30,15 +30,31 @@ mujoco.mj_resetData(model, data)  # Reset state and time.
 
 
 # Create a logger
-logger = Logger(DATA_DIR + "log.csv", ["time", "qpos", "qvel", "qacc", "ctrl"])
+header = ["time"]
+header += [f"qpos_{i}" for i in range(model.nq)]
+header += [f"qvel_{i}" for i in range(model.nv)]
+header += [f"qacc_{i}" for i in range(model.nv)]
+header += [f"ctrl_{i}" for i in range(model.na)]
+
+logger = Logger(DATA_DIR + "log.csv", header)
 # Log the initial state
+
 message = {
     "time": data.time,
-    "qpos": data.qpos.copy(),
-    "qvel": data.qvel.copy(),
-    "qacc": data.qacc.copy(),
-    "ctrl": data.ctrl.copy(),
+    **{
+        f"qpos_{i}": data.qpos[i] for i in range(model.nq)
+    },
+    **{
+        f"qvel_{i}": data.qvel[i] for i in range(model.nv)
+    },
+    **{
+        f"qacc_{i}": data.qacc[i] for i in range(model.nv)
+    },
+    **{
+        f"ctrl_{i}": data.ctrl[i] for i in range(model.na)
+    },
 }
+
 logger.log(message)
 
 
@@ -58,7 +74,7 @@ target_q = np.array(
 qpos_start = data.qpos.copy()
 qpos_end = target_q
 
-trajectory_interpolator = TrajectoryInterpolator(qpos_start, np.zeros(7), duration, qpos_end, np.zeros(7))
+trajectory_interpolator = TrajectoryInterpolator(qpos_start, np.zeros(7), 0.5, qpos_end, np.zeros(7), time_step=model.opt.timestep)
 
 #model.opt.disableflags = 1 << 4 # disable contact constraints
 
@@ -74,8 +90,8 @@ while data.time < duration:
 
     # inverse dynamics to compute required torque.
     # set qacc to the desired acceleration
-    #target_acc = trajectory_interpolator.get_acc(data.qpos, data.qvel, t)
-    target_acc = trajectory_interpolator.get_acc_by_derivative(data.qpos, data.qvel, t)
+    target_acc = trajectory_interpolator.get_acc(data.qpos, data.qvel, t)
+    #target_acc = trajectory_interpolator.get_acc_by_derivative(data.qpos, data.qvel, t)
     data.qacc[:] = target_acc
 
     mujoco.mj_inverse(model, data)
@@ -93,13 +109,23 @@ while data.time < duration:
         pixels = renderer.render()
         frames.append(pixels)
     
+    
     message = {
         "time": data.time,
-        "qpos": data.qpos.copy(),
-        "qvel": data.qvel.copy(),
-        "qacc": data.qacc.copy(),
-        "ctrl": data.ctrl.copy(),
+        **{
+            f"qpos_{i}": data.qpos[i] for i in range(model.nq)
+        },
+        **{
+            f"qvel_{i}": data.qvel[i] for i in range(model.nv)
+        },
+        **{
+            f"qacc_{i}": data.qacc[i] for i in range(model.nv)
+        },
+        **{
+            f"ctrl_{i}": data.ctrl[i] for i in range(model.na)
+        },
     }
+
     logger.log(message)
 
 
@@ -107,5 +133,5 @@ if renderer is not None:
     renderer.close()
 
 imageio.mimsave(os.path.join(VIDEO_DIR, "video.mp4"), frames, fps=framerate)
-logger.save()
-#logger.plot_data()
+#logger.save()
+logger.plot_columns("results/qpos.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])

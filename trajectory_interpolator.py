@@ -32,7 +32,7 @@ class TrajectoryInterpolator:
         vel_error = self.final_qvel - qvel
 
         # Use the derivative of the error to compute the desired acceleration
-        desired_acc = pos_error/self.time_step
+        desired_acc = (pos_error/self.time_step - qvel)/self.time_step
 
         return desired_acc
 
@@ -40,10 +40,19 @@ class TrajectoryInterpolator:
     def get_acc(self,qpos, qvel, t):
         """Compute the desired acceleration at time t"""
 
+        if t > self.duration:
+            return np.zeros_like(qvel)
         # Use spline interpolation
-
         # Compute the desired acceleration at time t
         
-        
+        # Create the spline
+        times = np.array([t, self.duration])  # start and end times
+        positions = np.array([self.starting_qpos, self.final_qpos])
+        velocities = np.array([self.starting_qvel, self.final_qvel])
 
-        return self.spline(t, 2)
+        # Create the cubic Hermite spline (Cubic Hermite is good for qpos and qvel)
+        self.spline = CubicHermiteSpline(times, positions, velocities)
+
+
+
+        return self.spline(t, 2)  # 2nd derivative is acceleration
