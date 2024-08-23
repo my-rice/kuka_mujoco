@@ -19,7 +19,8 @@
   <worldbody>
     <light pos="0 0 3.5" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
-
+    <camera name="top" mode="targetbody" target="pelvis" pos="10.0 1.0 3.5" />
+    
     <!-- Alternative representation of Vector (1,0,0) in red using cylinder -->
     <!-- <geom type="cylinder" fromto="3 3 3 4 3 3" rgba="1 0 0 1" size="0.02"/>
     <geom type="cylinder" fromto="3 3 3 3 4 3" rgba="0 1 0 1" size="0.02"/> -->

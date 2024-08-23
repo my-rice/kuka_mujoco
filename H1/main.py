@@ -23,7 +23,7 @@ DATA_DIR = "../results/h1/"
 # target_vel = [-3.34899157,56.3294191, -125.891773, 121.353618, 5.2636477, -199.343902, -63.5353335, -235.091203, 465.345048, -59.6334671, -341.345224, 72.1901469, -292.451727, 171.757122, -131.385152, -235.177784, 151.344121, 131.025596, 437.882499, 141.373359, -105.535527, -136.104178, 4.83413384, -102.166934, -127.759095]
     
 
-def run(model, data, renderer, logger, traj_element, frames):
+def run(model, data, renderer, logger, traj_element, frames, framerate=30):
     
     message = {
         "time": data.time,
@@ -43,23 +43,21 @@ def run(model, data, renderer, logger, traj_element, frames):
 
     logger.log(message)
 
-
     timestep = traj_element[0]
     target_q = traj_element[1:27]
-    
+    #print("target_q", target_q)
 
     qpos_start = data.qpos.copy()
     qpos_end = target_q
 
     starting_vel = data.qvel.copy()
     target_vel = traj_element[27:52]
+    #print("target_vel", target_vel)
 
-    duration = np.round(timestep - data.time)
+    duration = np.round(timestep - data.time, 3)
     
-    print("target_vel", len(target_vel))
     trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:26], starting_vel[6:25], duration, qpos_end[7:26], target_vel[6:25], time_step=model.opt.timestep)
     trajectory_interpolator2 = TrajectoryInterpolator(qpos_start[0:3], starting_vel[0:3], duration, qpos_end[0:3], target_vel[0:3], time_step=model.opt.timestep)
-    #model.opt.disableflags = 1 << 4 # disable contact constraints
 
     target_rotation = R.from_quat(target_q[3:7].tolist(), scalar_first=True)
     target_angles = target_rotation.as_euler('xyz', degrees=False)
@@ -71,16 +69,16 @@ def run(model, data, renderer, logger, traj_element, frames):
     # print("target_angles", target_angles)
     trajectory_interpolator3 = TrajectoryInterpolator(starting_angles, starting_vel[3:6], duration, target_angles, target_vel[3:6], time_step=model.opt.timestep)
 
-    print("data.qpos", data.qpos)
-    print("data.ctrl", data.ctrl)
-    print("data.qacc", data.qacc)
-
-    while data.time <= timestep+0.002:
+    # print("data.qpos", data.qpos)
+    # print("data.ctrl", data.ctrl)
+    # print("data.qacc", data.qacc)
+    t = 0
+    while data.time <= timestep:
         
-        data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(25),-1,1))
-        data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(21,6),-0.1,0.1)) 
+        # data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(25),-1,1))
+        # data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(21,6),-0.1,0.1)) 
 
-        t = data.time
+        t += model.opt.timestep
 
         prev_acc = data.qacc.copy()
         
@@ -105,14 +103,12 @@ def run(model, data, renderer, logger, traj_element, frames):
         #print("data.qacc", data.qacc)
         mujoco.mj_step(model, data)
 
-        
         # compute desired acceleration
 
         if len(frames) < data.time * framerate:
-            renderer.update_scene(data, scene_option=dict())
+            renderer.update_scene(data, camera="top")
             pixels = renderer.render()
             frames.append(pixels)
-        
         
         message = {
             "time": data.time,
@@ -136,16 +132,17 @@ def run(model, data, renderer, logger, traj_element, frames):
 if __name__ == "__main__":
 
     traj = np.load("./traj.npy")
-
+    print(traj.shape)
     # Load the model
     model = mujoco.MjModel.from_xml_path(PATH_TO_MODEL)
     data = mujoco.MjData(model)
 
-    renderer = mujoco.Renderer(model, 480, 640)
-
-    value = 100000
-    # set actuator control range: -value to value for all actuators
-    model.actuator_ctrlrange = np.array([[-value, value]] * model.nu)
+    renderer = mujoco.Renderer(model)
+    renderer.update_scene(data, camera="top")
+    pixels = renderer.render()
+    # value = 100000
+    # # set actuator control range: -value to value for all actuators
+    # model.actuator_ctrlrange = np.array([[-value, value]] * model.nu)
 
     framerate = 30  # (Hz)
 
@@ -153,7 +150,6 @@ if __name__ == "__main__":
     frames = []
     mujoco.mj_resetData(model, data)  # Reset state and time.
 
-    
     # Create a logger
     header = ["time"]
     header += [f"qpos_{i}" for i in range(model.nq)]
@@ -163,13 +159,14 @@ if __name__ == "__main__":
 
     logger = Logger(DATA_DIR + "log.csv", header)
 
+    horizon = 200
+    n_steps = traj.shape[0]//horizon
 
+    for i in range(n_steps):
 
-    for i in range(4):
-
-        traj_index = i*200
+        traj_index = (i+1)*horizon
         
-        run(model, data, renderer, logger, traj[traj_index],frames)
+        run(model, data, renderer, logger, traj[traj_index],frames, framerate=framerate)
 
         target_q = traj[traj_index][1:27]
         target_vel = traj[traj_index][27:52]
