@@ -27,18 +27,6 @@ class TrajectoryInterpolator:
         # Setup the interpolator
         self.setup()
 
-    # def get_acc_by_derivative(self, qpos, qvel, t):
-    #     """Compute the desired acceleration at time t"""
-
-    #     pos_error = self.final_qpos - qpos
-    #     vel_error = self.final_qvel - qvel
-
-    #     # Use the derivative of the error to compute the desired acceleration
-    #     desired_acc = (pos_error/self.time_step - qvel)/self.time_step
-
-    #     return desired_acc
-
-
 
     def setup(self):
         self.a0 = self.starting_qpos

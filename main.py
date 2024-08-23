@@ -7,9 +7,9 @@ from trajectory_interpolator import TrajectoryInterpolator
 
 import os
 import imageio
-import copy
 
-from mujoco_mpc import agent as agent_lib
+from scipy.spatial.transform import Rotation as R
+
 
 PATH_TO_MODEL = "kuka_iiwa_14/scene.xml"
 VIDEO_DIR = "results/"
@@ -65,6 +65,13 @@ def run():
     # Instantiate the interpolator
     target_q = np.array(
         [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
             0.28932849,
             0.92062463,
             -0.9442432,
@@ -78,40 +85,68 @@ def run():
     qpos_start = data.qpos.copy()
     qpos_end = target_q
 
-    target_vel = np.zeros(7)
-    trajectory_interpolator = TrajectoryInterpolator(qpos_start, np.zeros(7), 5, qpos_end, target_vel, time_step=model.opt.timestep)
-
+    target_vel = np.zeros(13)
+    trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:14], np.zeros(7), 5, qpos_end[7:14], target_vel[6:13], time_step=model.opt.timestep)
+    trajectory_interpolator2 = TrajectoryInterpolator(qpos_start[0:3], np.zeros(3), 5, qpos_end[0:3], target_vel[0:3], time_step=model.opt.timestep)
     #model.opt.disableflags = 1 << 4 # disable contact constraints
 
+    target_rotation = R.from_quat(target_q[3:7].tolist(), scalar_first=True)
+    target_angles = target_rotation.as_euler('xyz', degrees=False)
 
+    starting_rotation = R.from_quat(qpos_start[3:7].tolist(), scalar_first=True)
+    starting_angles = starting_rotation.as_euler('xyz', degrees=False)
+
+    print("starting_angles", starting_angles)
+    print("target_angles", target_angles)
+    trajectory_interpolator3 = TrajectoryInterpolator(starting_angles, np.zeros(3), 5, target_angles, np.zeros(3), time_step=model.opt.timestep)
+
+
+
+    print("data.qpos", data.qpos)
+    print("data.ctrl", data.ctrl)
+    print("data.qacc", data.qacc)
+    print("data.qfrc_inverse", data.qfrc_inverse)
+    print("data.qfrc_applied", data.qfrc_applied)
+    print("data.xfrc_applied", data.xfrc_applied)
+    data.qfrc_applied = np.zeros(13)
+    data.xfrc_applied = np.zeros((model.nbody, 6))
+
+    vel = np.zeros(13)
+    mujoco.mj_differentiatePos(model, vel, duration, data.qpos, target_q)
+    print("vel", vel)
 
     while data.time < duration:
         
-        # compute desired acceleration
+        
         t = data.time
+
         prev_acc = data.qacc.copy()
         
-        # q_step_t = trajectory_interpolator.get_acc(data.qpos, data.qvel, t)
-        # vel = np.zeros(7)
-        # mujoco.mj_differentiatePos(model, vel, model.opt.timestep ,data.qpos, q_step_t)
-        # target_acc = np.zeros(7)
-        # mujoco.mj_differentiatePos(model, target_acc,model.opt.timestep,data.qvel, vel)
-                
-        target_acc = trajectory_interpolator.get_acc(data.qpos, data.qvel, t)
+        target_acc = trajectory_interpolator.get_acc(data.qpos[7:14], data.qvel[6:13], t)
 
 
-        data.qacc[:] = target_acc
+        data.qacc[6:13] = target_acc
+        data.qacc[0:3] = trajectory_interpolator2.get_acc(data.qpos[0:3], data.qvel[0:3], t)
+        data.qacc[3:6] = trajectory_interpolator3.get_acc(data.qpos[7:11], data.qvel[3:6], t)
         mujoco.mj_inverse(model, data)
+        
         # set torque as control
         # print ctrl range
-        print("ctrl range", model.actuator_ctrlrange)
+        #print("ctrl range", model.actuator_ctrlrange)
+        #print("len(qfrc_inverse)", len(data.qfrc_inverse))
+        data.ctrl = data.qfrc_inverse.copy()[6:13]
+        data.qfrc_applied[0:6] = data.qfrc_inverse.copy()[0:6]
+        #data.xfrc_applied = np.zeros((model.nbody, 6))
 
-        data.ctrl[:] = data.qfrc_inverse.copy()
         #print("data.solver_fwdinv", data.solver_fwdinv) # See if the inverse dynamics will be equal to the computed torque
-        data.qacc[:] = prev_acc
+        # data.qacc[6:13] = prev_acc[6:13]
+        # data.qacc[0:6] = np.zeros(6)
+        data.qacc = prev_acc
+        #print("data.qacc", data.qacc)
         mujoco.mj_step(model, data)
 
-
+        
+        # compute desired acceleration
 
         if len(frames) < data.time * framerate:
             renderer.update_scene(data, scene_option=dict())
