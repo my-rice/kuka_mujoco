@@ -37,10 +37,14 @@ class TrajectoryInterpolator:
 
     def get_acc(self,qpos, qvel, t):
         """Compute the desired position at time t"""
-
+        t = round(t, 4)
         if t > self.duration:
-            return np.zeros(7)
+            return np.zeros_like(self.final_qvel)
+        # if t == 0:
+        #     print("t", t)
 
+        if t == self.duration:
+            print("t", t)
         return 6*self.a3*t + 2*self.a2
     
     def get_pos(self, t):
@@ -55,18 +59,22 @@ class TrajectoryInterpolator:
 
 if __name__ == "__main__":
 
-    qpos_start = np.array([0,0])
-    qpos_end = np.array([1,1])
+    qpos_start = np.array([1,1])
+    qpos_end = np.array([2,2])
 
-    qvel_start = np.array([0,0])
-    qvel_end = np.array([0,0])
+    qvel_start = np.array([1,1])
+    qvel_end = np.array([2,2])
 
     trajectory_interpolator = TrajectoryInterpolator(qpos_start, qvel_start, 1, qpos_end, qvel_end)
 
+    print("positions test")
+    print(trajectory_interpolator.get_pos(0.0))
     print(trajectory_interpolator.get_pos(0.5))
     print(trajectory_interpolator.get_pos(1.0))
     print(trajectory_interpolator.get_pos(1.5))
 
+    print("accelerations test")
+    print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 0.0))
     print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 0.5))
     print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 1.0))
     print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 1.5))
