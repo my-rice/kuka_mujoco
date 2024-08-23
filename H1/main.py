@@ -11,10 +11,11 @@ import imageio
 from scipy.spatial.transform import Rotation as R
 
 
-PATH_TO_MODEL = "kuka_iiwa_14/scene.xml"
-VIDEO_DIR = "results/"
-DATA_DIR = "results/"
+PATH_TO_MODEL = "h1/scene.xml"
+VIDEO_DIR = "../results/h1/"
+DATA_DIR = "../results/h1/"
 
+traj = np.load("./traj.npy")
 
 def run():
     # Load the model
@@ -23,8 +24,17 @@ def run():
 
     renderer = mujoco.Renderer(model, 480, 640)
 
+    value = 1000000
 
-    duration = 5  # (seconds)
+    # set actuator control range: -value to value for all actuators
+    model.actuator_ctrlrange = np.array([[-value, value]] * model.nu)
+
+    # set joint range: -value to value for all joints
+
+    duration = 0.4  # (seconds)
+    
+    
+    
     framerate = 30  # (Hz)
     n_steps = int(np.ceil(duration * framerate)) + 1
 
@@ -63,33 +73,28 @@ def run():
 
 
     # Instantiate the interpolator
-    target_q = np.array(
-        [
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            0.28932849,
-            0.92062463,
-            -0.9442432,
-            -1.02045466,
-            1.2824041,
-            -0.40766866,
-            -1.41391154,
-        ]
-    )
+    # target_q = np.array(
+    #     [0.0108746505, 0.409904735, -0.04571992, 0.363424591, 0.91689547, 0.164697949, 0.0099925136, -1.08606159, -3.05513108, 2.39996658, -1.58373738, -1.53605197, 0.357645804, -3.9112009, 1.06593459, -0.612316674, -1.70175744, -0.158552603, 0.316076873, 1.62802804, 0.393499762, -0.880202047, -1.0811211, -0.900504928, -0.569864469, -1.42788048, 
+         
+    #     ])
+    temp = traj[200]
+    print("trajectory", traj.shape)
+    print("temp", temp)
+    timestep = temp[0]
+    target_q = temp[1:27]
+    
 
     qpos_start = data.qpos.copy()
     qpos_end = target_q
 
-    target_vel = np.clip(np.random.rand(13),-1,1)
-    starting_vel = np.clip(np.random.rand(13),-0.1,0.1)
+    # target_vel = [-3.34899157,56.3294191, -125.891773, 121.353618, 5.2636477, -199.343902, -63.5353335, -235.091203, 465.345048, -59.6334671, -341.345224, 72.1901469, -292.451727, 171.757122, -131.385152, -235.177784, 151.344121, 131.025596, 437.882499, 141.373359, -105.535527, -136.104178, 4.83413384, -102.166934, -127.759095]
+    
+    target_vel = temp[27:52]
+    
+    starting_vel = np.zeros(25)
     data.qvel = starting_vel.copy()
-
-    trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:14], starting_vel[6:13], duration, qpos_end[7:14], target_vel[6:13], time_step=model.opt.timestep)
+    print("target_vel", len(target_vel))
+    trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:26], starting_vel[6:25], duration, qpos_end[7:26], target_vel[6:25], time_step=model.opt.timestep)
     trajectory_interpolator2 = TrajectoryInterpolator(qpos_start[0:3], starting_vel[0:3], duration, qpos_end[0:3], target_vel[0:3], time_step=model.opt.timestep)
     #model.opt.disableflags = 1 << 4 # disable contact constraints
 
@@ -103,54 +108,36 @@ def run():
     print("target_angles", target_angles)
     trajectory_interpolator3 = TrajectoryInterpolator(starting_angles, starting_vel[3:6], duration, target_angles, target_vel[3:6], time_step=model.opt.timestep)
 
-
-
     print("data.qpos", data.qpos)
     print("data.ctrl", data.ctrl)
     print("data.qacc", data.qacc)
-    print("data.qfrc_inverse", data.qfrc_inverse)
-    print("data.qfrc_applied", data.qfrc_applied)
-    print("data.xfrc_applied", data.xfrc_applied)
 
-    while data.time <= duration:
+    while data.time <= duration+0.002:
         
-        data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(13),-1,1))
-        data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(9,6),-0.1,0.1)) 
+        data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(25),-1,1))
+        data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(21,6),-0.1,0.1)) 
 
         t = data.time
 
         prev_acc = data.qacc.copy()
         
 
-        target_acc = np.zeros(13)
-        target_acc[6:13] = trajectory_interpolator.get_acc(data.qpos[7:14], data.qvel[6:13], t)
+        target_acc = np.zeros(25)
+        target_acc[6:25] = trajectory_interpolator.get_acc(data.qpos[7:26], data.qvel[6:25], t)
         target_acc[0:3] = trajectory_interpolator2.get_acc(data.qpos[0:3], data.qvel[0:3], t)
         target_acc[3:6] = trajectory_interpolator3.get_acc(data.qpos[3:7], data.qvel[3:6], t)
 
-        data.qacc[6:13] = target_acc[6:13]
+        data.qacc[6:25] = target_acc[6:25]
         data.qacc[0:3] = target_acc[0:3]
         data.qacc[3:6] = target_acc[3:6]
         
-        
         mujoco.mj_inverse(model, data)
         
-        # set torque as control
-        # print ctrl range
-        #print("ctrl range", model.actuator_ctrlrange)
-        #print("len(qfrc_inverse)", len(data.qfrc_inverse))
-
         data.xfrc_applied = np.zeros_like(data.xfrc_applied)
         data.qfrc_applied = np.zeros_like(data.qfrc_applied)
-        #data.qfrc_applied = data.qfrc_inverse.copy()
-        
-        
-        data.ctrl = data.qfrc_inverse.copy()[6:13]
-        data.qfrc_applied[0:6] = data.qfrc_inverse.copy()[0:6]
 
-        #data.qfrc_applied = data.qfrc_inverse.copy()
-        #print("data.solver_fwdinv", data.solver_fwdinv) # See if the inverse dynamics will be equal to the computed torque
-        # data.qacc[6:13] = prev_acc[6:13]
-        # data.qacc[0:6] = np.zeros(6)
+        data.qfrc_applied = data.qfrc_inverse.copy()
+        
         data.qacc = prev_acc
         #print("data.qacc", data.qacc)
         mujoco.mj_step(model, data)
@@ -184,6 +171,7 @@ def run():
 
     
     print("data.qpos", data.qpos)
+    print("data.qvel", data.qvel)
     print("position error", target_q-data.qpos)
     print("velocity error", target_vel-data.qvel)
     if renderer is not None:
@@ -191,7 +179,7 @@ def run():
 
     imageio.mimsave(os.path.join(VIDEO_DIR, "video.mp4"), frames, fps=framerate)
     #logger.save()
-    logger.plot_columns("results/qpos.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
+    logger.plot_columns(DATA_DIR+ "qpos.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
 
 if __name__ == "__main__":
     run()

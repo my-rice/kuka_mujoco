@@ -39,7 +39,6 @@ class TrajectoryInterpolator:
         """Compute the desired position at time t"""
         t = round(t, 4)
         if t > self.duration:
-            print("t", t, "shape", self.final_qvel.shape)
             return np.zeros_like(self.final_qvel)
         # if t == 0:
         #     print("t", t)
