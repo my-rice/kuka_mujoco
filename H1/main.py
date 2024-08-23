@@ -15,44 +15,16 @@ PATH_TO_MODEL = "h1/scene.xml"
 VIDEO_DIR = "../results/h1/"
 DATA_DIR = "../results/h1/"
 
-traj = np.load("./traj.npy")
 
-def run():
-    # Load the model
-    model = mujoco.MjModel.from_xml_path(PATH_TO_MODEL)
-    data = mujoco.MjData(model)
-
-    renderer = mujoco.Renderer(model, 480, 640)
-
-    value = 1000000
-
-    # set actuator control range: -value to value for all actuators
-    model.actuator_ctrlrange = np.array([[-value, value]] * model.nu)
-
-    # set joint range: -value to value for all joints
-
-    duration = 0.4  # (seconds)
+# Instantiate the interpolator
+    # target_q = np.array(
+    #     [0.0108746505, 0.409904735, -0.04571992, 0.363424591, 0.91689547, 0.164697949, 0.0099925136, -1.08606159, -3.05513108, 2.39996658, -1.58373738, -1.53605197, 0.357645804, -3.9112009, 1.06593459, -0.612316674, -1.70175744, -0.158552603, 0.316076873, 1.62802804, 0.393499762, -0.880202047, -1.0811211, -0.900504928, -0.569864469, -1.42788048, 
+    #     ])
+# target_vel = [-3.34899157,56.3294191, -125.891773, 121.353618, 5.2636477, -199.343902, -63.5353335, -235.091203, 465.345048, -59.6334671, -341.345224, 72.1901469, -292.451727, 171.757122, -131.385152, -235.177784, 151.344121, 131.025596, 437.882499, 141.373359, -105.535527, -136.104178, 4.83413384, -102.166934, -127.759095]
     
+
+def run(model, data, renderer, logger, traj_element, frames):
     
-    
-    framerate = 30  # (Hz)
-    n_steps = int(np.ceil(duration * framerate)) + 1
-
-    # Simulate and display video.
-    frames = []
-    mujoco.mj_resetData(model, data)  # Reset state and time.
-
-    
-    # Create a logger
-    header = ["time"]
-    header += [f"qpos_{i}" for i in range(model.nq)]
-    header += [f"qvel_{i}" for i in range(model.nv)]
-    header += [f"qacc_{i}" for i in range(model.nv)]
-    header += [f"ctrl_{i}" for i in range(model.na)]
-
-    logger = Logger(DATA_DIR + "log.csv", header)
-    # Log the initial state
-
     message = {
         "time": data.time,
         **{
@@ -72,27 +44,18 @@ def run():
     logger.log(message)
 
 
-    # Instantiate the interpolator
-    # target_q = np.array(
-    #     [0.0108746505, 0.409904735, -0.04571992, 0.363424591, 0.91689547, 0.164697949, 0.0099925136, -1.08606159, -3.05513108, 2.39996658, -1.58373738, -1.53605197, 0.357645804, -3.9112009, 1.06593459, -0.612316674, -1.70175744, -0.158552603, 0.316076873, 1.62802804, 0.393499762, -0.880202047, -1.0811211, -0.900504928, -0.569864469, -1.42788048, 
-         
-    #     ])
-    temp = traj[200]
-    print("trajectory", traj.shape)
-    print("temp", temp)
-    timestep = temp[0]
-    target_q = temp[1:27]
+    timestep = traj_element[0]
+    target_q = traj_element[1:27]
     
 
     qpos_start = data.qpos.copy()
     qpos_end = target_q
 
-    # target_vel = [-3.34899157,56.3294191, -125.891773, 121.353618, 5.2636477, -199.343902, -63.5353335, -235.091203, 465.345048, -59.6334671, -341.345224, 72.1901469, -292.451727, 171.757122, -131.385152, -235.177784, 151.344121, 131.025596, 437.882499, 141.373359, -105.535527, -136.104178, 4.83413384, -102.166934, -127.759095]
+    starting_vel = data.qvel.copy()
+    target_vel = traj_element[27:52]
+
+    duration = np.round(timestep - data.time)
     
-    target_vel = temp[27:52]
-    
-    starting_vel = np.zeros(25)
-    data.qvel = starting_vel.copy()
     print("target_vel", len(target_vel))
     trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:26], starting_vel[6:25], duration, qpos_end[7:26], target_vel[6:25], time_step=model.opt.timestep)
     trajectory_interpolator2 = TrajectoryInterpolator(qpos_start[0:3], starting_vel[0:3], duration, qpos_end[0:3], target_vel[0:3], time_step=model.opt.timestep)
@@ -104,15 +67,15 @@ def run():
     starting_rotation = R.from_quat(qpos_start[3:7].tolist(), scalar_first=True)
     starting_angles = starting_rotation.as_euler('xyz', degrees=False)
 
-    print("starting_angles", starting_angles)
-    print("target_angles", target_angles)
+    # print("starting_angles", starting_angles)
+    # print("target_angles", target_angles)
     trajectory_interpolator3 = TrajectoryInterpolator(starting_angles, starting_vel[3:6], duration, target_angles, target_vel[3:6], time_step=model.opt.timestep)
 
     print("data.qpos", data.qpos)
     print("data.ctrl", data.ctrl)
     print("data.qacc", data.qacc)
 
-    while data.time <= duration+0.002:
+    while data.time <= timestep+0.002:
         
         data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(25),-1,1))
         data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(21,6),-0.1,0.1)) 
@@ -169,17 +132,56 @@ def run():
 
         logger.log(message)
 
+
+if __name__ == "__main__":
+
+    traj = np.load("./traj.npy")
+
+    # Load the model
+    model = mujoco.MjModel.from_xml_path(PATH_TO_MODEL)
+    data = mujoco.MjData(model)
+
+    renderer = mujoco.Renderer(model, 480, 640)
+
+    value = 100000
+    # set actuator control range: -value to value for all actuators
+    model.actuator_ctrlrange = np.array([[-value, value]] * model.nu)
+
+    framerate = 30  # (Hz)
+
+    # Simulate and display video.
+    frames = []
+    mujoco.mj_resetData(model, data)  # Reset state and time.
+
     
-    print("data.qpos", data.qpos)
-    print("data.qvel", data.qvel)
-    print("position error", target_q-data.qpos)
-    print("velocity error", target_vel-data.qvel)
+    # Create a logger
+    header = ["time"]
+    header += [f"qpos_{i}" for i in range(model.nq)]
+    header += [f"qvel_{i}" for i in range(model.nv)]
+    header += [f"qacc_{i}" for i in range(model.nv)]
+    header += [f"ctrl_{i}" for i in range(model.na)]
+
+    logger = Logger(DATA_DIR + "log.csv", header)
+
+
+
+    for i in range(4):
+
+        traj_index = i*200
+        
+        run(model, data, renderer, logger, traj[traj_index],frames)
+
+        target_q = traj[traj_index][1:27]
+        target_vel = traj[traj_index][27:52]
+        logger.plot_columns(DATA_DIR+ f"qpos_iter{i}.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
+
+        print("data.qpos", data.qpos)
+        print("data.qvel", data.qvel)
+        print("position error", target_q-data.qpos)
+        print("velocity error", target_vel-data.qvel)
     if renderer is not None:
         renderer.close()
 
+    # Save the video
     imageio.mimsave(os.path.join(VIDEO_DIR, "video.mp4"), frames, fps=framerate)
-    #logger.save()
-    logger.plot_columns(DATA_DIR+ "qpos.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
-
-if __name__ == "__main__":
-    run()
+        
