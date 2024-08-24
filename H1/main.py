@@ -86,23 +86,39 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
         
 
         target_acc = np.zeros(25)
-        target_acc[6:25] = trajectory_interpolator.get_acc(data.qpos[7:26], data.qvel[6:25], t)
-        target_acc[0:3] = trajectory_interpolator2.get_acc(data.qpos[0:3], data.qvel[0:3], t)
-        target_acc[3:6] = trajectory_interpolator3.get_acc(data.qpos[3:7], data.qvel[3:6], t)
+
+        target_acc[6:25] = trajectory_interpolator.get_acc(t)
+        target_acc[0:3] = trajectory_interpolator2.get_acc(t)
+        target_acc[3:6] = trajectory_interpolator3.get_acc(t)
+
 
         data.qacc[6:25] = target_acc[6:25]
         data.qacc[0:3] = target_acc[0:3]
         data.qacc[3:6] = target_acc[3:6]
-        
+
         mujoco.mj_inverse(model, data)
         
-        data.xfrc_applied = np.zeros_like(data.xfrc_applied)
-        data.qfrc_applied = np.zeros_like(data.qfrc_applied)
+        # Solution 1. It is not good because the control will be clipped. If the control is clipped, the performance of the controller will be affected.
+        # Here the robot has a free joint, so the net torque is not applied to the free joint if we use data.ctrl.
+        # To solve the problem, the terms of the control that are applied to the free joint are copied to data.qfrc_applied.
 
-        data.qfrc_applied = data.qfrc_inverse.copy()
+        # data.ctrl = data.qfrc_inverse.copy()[6:25]
+        # data.qfrc_applied[0:6] = data.qfrc_inverse[0:6]
+
+        # Getting info about the performance. If any value in data.ctrl is greater of the maximum value, print a warning with the value of the control.
         
+        # ctrl = data.qfrc_inverse.copy()[6:25]
+        # for i in range(len(ctrl)):
+        #     if ctrl[i] > model.actuator_ctrlrange[i][1]:
+        #         print("Warning: control value is greater than the maximum value", ctrl[i], "max value", model.actuator_ctrlrange[i][1])
+        #     if ctrl[i] < model.actuator_ctrlrange[i][0]:
+        #         print("Warning: control value is smaller than the minimum value", ctrl[i], "min value", model.actuator_ctrlrange[i][0])
+
+
+        # Solution 2. This works every time. The control is not clipped.
+        data.qfrc_applied = data.qfrc_inverse.copy()
+
         data.qacc = prev_acc
-        #print("data.qacc", data.qacc)
         mujoco.mj_step(model, data)
 
         if len(frames) < data.time * framerate:
@@ -140,7 +156,7 @@ if __name__ == "__main__":
     data = mujoco.MjData(model)
 
     # Create a renderer
-    renderer = mujoco.Renderer(model)
+    renderer = mujoco.Renderer(model, 480, 640)
     renderer.update_scene(data, camera="top")
     pixels = renderer.render()
     
@@ -177,9 +193,10 @@ if __name__ == "__main__":
         target_q = traj[traj_index][1:27]
         target_vel = traj[traj_index][27:52]
         logger.plot_columns(DATA_DIR+ f"qpos_iter{i}.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
+        
+        # TODO: Solve the bugs in the plotting of other variables
+        #logger.plot_columns(DATA_DIR+ f"ctrl_iter{i}.png", columns_names=[f"ctrl_{i}" for i in range(model.nv)], references = [0 for i in range(model.nv)])
 
-        print("data.qpos", data.qpos)
-        print("data.qvel", data.qvel)
         print("position error", target_q-data.qpos)
         print("velocity error", target_vel-data.qvel)
     if renderer is not None:

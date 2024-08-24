@@ -1,4 +1,3 @@
-
 # This file contains the TrajectoryInterpolator class, which is responsible for
 # computing the desired acceleration at any given time based on a several different
 # interpolation methods.
@@ -26,25 +25,30 @@ class TrajectoryInterpolator:
         self.a3 = (2*(self.starting_qpos - self.final_qpos) + (self.starting_qvel + self.final_qvel)*self.duration) / (self.duration**3)
 
 
-    def get_acc(self,qpos, qvel, t):
+    def get_acc(self, t):
         """Compute the desired position at time t"""
-        t = round(t, 4)
+        t = round(t, 4) # round to avoid floating point errors. WARNING: This may not be the best solution
         if t > self.duration:
             return np.zeros_like(self.final_qvel)
-        # if t == 0:
-        #     print("t", t)
 
-        if t == self.duration:
-            print("t", t)
         return 6*self.a3*t + 2*self.a2
     
     def get_pos(self, t):
         """Compute the desired position at time t"""
 
+        t = round(t, 4)
         if t > self.duration:
-            return self.final_qpos
+            return np.zeros_like(self.final_qpos)
 
         return self.a0 + self.a1*t + self.a2*t**2 + self.a3*t**3
+    
+    def get_vel(self, t):
+        """Compute the desired velocity at time t"""
+        t = round(t, 4)
+        if t > self.duration:
+            return np.zeros_like(self.final_qvel)
+
+        return self.a1 + 2*self.a2*t + 3*self.a3*t**2
         
 
 
@@ -65,8 +69,8 @@ if __name__ == "__main__":
     print(trajectory_interpolator.get_pos(1.5))
 
     print("accelerations test")
-    print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 0.0))
-    print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 0.5))
-    print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 1.0))
-    print(trajectory_interpolator.get_acc(qpos_start, qvel_start, 1.5))
+    print(trajectory_interpolator.get_acc(0.0))
+    print(trajectory_interpolator.get_acc(0.5))
+    print(trajectory_interpolator.get_acc(1.0))
+    print(trajectory_interpolator.get_acc(1.5))
     
