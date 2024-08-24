@@ -45,6 +45,7 @@ class Logger:
         
         plt.tight_layout()
         plt.savefig(output_file)
+        plt.close()
 
 
     def plot_column(self, column_name, output_file):
