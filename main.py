@@ -114,8 +114,8 @@ def run():
 
     while data.time <= duration:
         
-        data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(13),-1,1))
-        data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(9,6),-0.1,0.1)) 
+        # data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(13),-1,1))
+        # data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(9,6),-0.1,0.1)) 
 
         t = data.time
 
@@ -123,9 +123,9 @@ def run():
         
 
         target_acc = np.zeros(13)
-        target_acc[6:13] = trajectory_interpolator.get_acc(data.qpos[7:14], data.qvel[6:13], t)
-        target_acc[0:3] = trajectory_interpolator2.get_acc(data.qpos[0:3], data.qvel[0:3], t)
-        target_acc[3:6] = trajectory_interpolator3.get_acc(data.qpos[3:7], data.qvel[3:6], t)
+        target_acc[6:13] = trajectory_interpolator.get_acc(t)
+        target_acc[0:3] = trajectory_interpolator2.get_acc(t)
+        target_acc[3:6] = trajectory_interpolator3.get_acc(t)
 
         data.qacc[6:13] = target_acc[6:13]
         data.qacc[0:3] = target_acc[0:3]
@@ -134,23 +134,13 @@ def run():
         
         mujoco.mj_inverse(model, data)
         
-        # set torque as control
-        # print ctrl range
-        #print("ctrl range", model.actuator_ctrlrange)
-        #print("len(qfrc_inverse)", len(data.qfrc_inverse))
-
-        data.xfrc_applied = np.zeros_like(data.xfrc_applied)
-        data.qfrc_applied = np.zeros_like(data.qfrc_applied)
-        #data.qfrc_applied = data.qfrc_inverse.copy()
+        # data.xfrc_applied = np.zeros_like(data.xfrc_applied)
+        # data.qfrc_applied = np.zeros_like(data.qfrc_applied)
         
         
         data.ctrl = data.qfrc_inverse.copy()[6:13]
         data.qfrc_applied[0:6] = data.qfrc_inverse.copy()[0:6]
 
-        #data.qfrc_applied = data.qfrc_inverse.copy()
-        #print("data.solver_fwdinv", data.solver_fwdinv) # See if the inverse dynamics will be equal to the computed torque
-        # data.qacc[6:13] = prev_acc[6:13]
-        # data.qacc[0:6] = np.zeros(6)
         data.qacc = prev_acc
         #print("data.qacc", data.qacc)
         mujoco.mj_step(model, data)

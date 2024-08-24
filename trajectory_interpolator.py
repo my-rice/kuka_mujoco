@@ -27,15 +27,13 @@ class TrajectoryInterpolator:
         self.a3 = (2*(self.starting_qpos - self.final_qpos) + (self.starting_qvel + self.final_qvel)*self.duration) / (self.duration**3)
 
 
-    def get_acc(self,qpos, qvel, t):
+    def get_acc(self, t):
         """Compute the desired position at time t"""
         t = round(t, 4)
         if t > self.duration:
             print("t", t, "shape", self.final_qvel.shape)
             return np.zeros_like(self.final_qvel)
-        # if t == 0:
-        #     print("t", t)
-
+        
         if t == self.duration:
             print("t", t)
         return 6*self.a3*t + 2*self.a2
@@ -47,6 +45,13 @@ class TrajectoryInterpolator:
             return self.final_qpos
 
         return self.a0 + self.a1*t + self.a2*t**2 + self.a3*t**3
+    
+    def get_vel(self, t):
+        """Compute the desired velocity at time t"""
+        if t > self.duration:
+            return self.final_qvel
+
+        return self.a1 + 2*self.a2*t + 3*self.a3*t**2
         
 
 
