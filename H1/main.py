@@ -25,6 +25,7 @@ DATA_DIR = "../results/h1/"
 
 def run(model, data, renderer, logger, traj_element, frames, framerate=30):
     
+    # Creating the message to log
     message = {
         "time": data.time,
         **{
@@ -43,9 +44,9 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
 
     logger.log(message)
 
+    # Getting the information from the trajectory.
     timestep = traj_element[0]
     target_q = traj_element[1:27]
-    #print("target_q", target_q)
 
     qpos_start = data.qpos.copy()
     qpos_end = target_q
@@ -54,8 +55,12 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
     target_vel = traj_element[27:52]
     #print("target_vel", target_vel)
 
+    # Interpolating the trajectory
+
+    # Get the total duration of the trajectory
     duration = np.round(timestep - data.time, 3)
     
+    # Instantiate the interpolator. The first will interpolate the position of the joints, the second the position of the free joint and the third the orientation of the free joint. These interpolators will be used to interpolate the acceleration of the joints.
     trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:26], starting_vel[6:25], duration, qpos_end[7:26], target_vel[6:25], time_step=model.opt.timestep)
     trajectory_interpolator2 = TrajectoryInterpolator(qpos_start[0:3], starting_vel[0:3], duration, qpos_end[0:3], target_vel[0:3], time_step=model.opt.timestep)
 
@@ -75,9 +80,6 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
     t = 0
     while data.time <= timestep:
         
-        # data.qfrc_applied = np.ones_like(data.qfrc_applied)*(np.clip(np.random.rand(25),-1,1))
-        # data.xfrc_applied = np.ones_like(data.xfrc_applied)*(np.clip(np.random.rand(21,6),-0.1,0.1)) 
-
         t += model.opt.timestep
 
         prev_acc = data.qacc.copy()
@@ -102,8 +104,6 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
         data.qacc = prev_acc
         #print("data.qacc", data.qacc)
         mujoco.mj_step(model, data)
-
-        # compute desired acceleration
 
         if len(frames) < data.time * framerate:
             renderer.update_scene(data, camera="top")
@@ -131,17 +131,21 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
 
 if __name__ == "__main__":
 
+    # Load the trajectory
     traj = np.load("./traj.npy")
     print(traj.shape)
+
     # Load the model
     model = mujoco.MjModel.from_xml_path(PATH_TO_MODEL)
     data = mujoco.MjData(model)
 
+    # Create a renderer
     renderer = mujoco.Renderer(model)
     renderer.update_scene(data, camera="top")
     pixels = renderer.render()
+    
+    # Raise the control range to eventually increase the performance of the controller.
     # value = 100000
-    # # set actuator control range: -value to value for all actuators
     # model.actuator_ctrlrange = np.array([[-value, value]] * model.nu)
 
     framerate = 30  # (Hz)
@@ -162,12 +166,14 @@ if __name__ == "__main__":
     horizon = 200
     n_steps = traj.shape[0]//horizon
 
+    # Run the simulation for n_steps trajectories elements
     for i in range(n_steps):
 
         traj_index = (i+1)*horizon
         
         run(model, data, renderer, logger, traj[traj_index],frames, framerate=framerate)
 
+        # Plot the qpos
         target_q = traj[traj_index][1:27]
         target_vel = traj[traj_index][27:52]
         logger.plot_columns(DATA_DIR+ f"qpos_iter{i}.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
