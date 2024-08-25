@@ -85,8 +85,8 @@ def run():
     qpos_start = data.qpos.copy()
     qpos_end = target_q
 
-    target_vel = np.clip(np.random.rand(13),-1,1)
-    starting_vel = np.clip(np.random.rand(13),-0.1,0.1)
+    target_vel = np.zeros(13)
+    starting_vel = np.zeros(13)
     data.qvel = starting_vel.copy()
 
     trajectory_interpolator = TrajectoryInterpolator(qpos_start[7:14], starting_vel[6:13], duration, qpos_end[7:14], target_vel[6:13], time_step=model.opt.timestep)
