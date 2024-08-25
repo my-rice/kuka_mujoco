@@ -27,9 +27,13 @@ target_q = np.array(
 
 print("INITIAL qpos", data.qpos)
 
+# data.xpos[1] = np.array([-1.5, -1.5, -1.5])
+# data.xquat[1] = np.array([1, 0, 0, 0])
+
+
 # Simulate and visualize
-for i in range(100):
+while True:
     
-  data.qpos[:len(target_q)] = target_q
+  #data.qpos[:len(target_q)] = target_q
   mujoco.mj_step(model, data)
   viewer.render()
