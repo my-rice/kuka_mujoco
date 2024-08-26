@@ -97,6 +97,14 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
         if body_id == -1:
             raise ValueError("Body not found")
         
+        body_id_2 = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_XBODY, 'pelvis') # mjOBJ_BODY # mjOBJ_XBODY
+        print("xbody: ", data.xpos[body_id_2])
+        print("xquat: ", data.xquat[body_id_2])
+        print("xipos: ", data.xipos[body_id_2])
+        print("ximat: ", data.ximat[body_id_2])
+        print("qpos: ", data.qpos[0:3])
+        print("qpos quat: ", data.qpos[3:7])
+
         puppet_data.xpos[body_id] = data.qpos[0:3]
         puppet_data.xquat[body_id] = data.qpos[3:7]
         #puppet_data.xipos[body_id] = data.qpos[0:3]
@@ -108,9 +116,8 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
 
         # Select pelvis dynamics in xfrc_applied. This is the force that will be applied to the pelvis.
         puppet_data.xfrc_applied[body_id] = data.qfrc_passive[0:6]
-        print("puppet_data.xfrc_applied", puppet_data.xfrc_applied)
+        #print("puppet_data.xfrc_applied", puppet_data.xfrc_applied)
         
-
         t += model.opt.timestep
 
         prev_acc = data.qacc.copy()
