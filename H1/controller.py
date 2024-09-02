@@ -1,5 +1,7 @@
 import numpy as np
 import mujoco
+import imageio
+import os
 
 
 class PositionController():
@@ -39,16 +41,20 @@ class PositionController():
 if __name__ == "__main__":
 
     PATH_TO_MODEL = "h1/scene.xml"
-
-    traj = np.load("./traj.npy")
+    VIDEO_DIR = "controller_videos/"
+    traj = np.load("./traj_straight_line.npy")
     print(traj.shape)
 
     # Load the model
     model = mujoco.MjModel.from_xml_path(PATH_TO_MODEL)
     data = mujoco.MjData(model)
+    renderer = mujoco.Renderer(model, 480, 640)
+    framerate = 60
+    frames = []
 
     controller = PositionController()
-    steps = 5
+    steps = 500
+    frame_skip = 5
     for i in range(steps):
         target_qpos = traj[i][1:27]
         target_qvel = traj[i][27:52]
@@ -60,6 +66,16 @@ if __name__ == "__main__":
         #print("torques",torques)
 
         data.ctrl[:] = torques
-        mujoco.mj_step(model,data)
+        for _ in range(frame_skip):
+            mujoco.mj_step(model,data)
+
+            if len(frames) < data.time * framerate:
+                renderer.update_scene(data, camera="top")
+                pixels = renderer.render()
+                frames.append(pixels)
 
         print("Pos error:", target_qpos[:26] - data.qpos[:26])
+    
+    print("Done")
+    print("Saving video...")
+    imageio.mimsave(os.path.join(VIDEO_DIR, "video.mp4"), frames, fps=framerate)

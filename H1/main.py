@@ -11,10 +11,11 @@ import imageio
 from scipy.spatial.transform import Rotation as R
 
 
-PATH_TO_MODEL = "h1/scene.xml"
-VIDEO_DIR = "../results/h1/"
-DATA_DIR = "../results/h1/"
+PATH_TO_MODEL = "./H1/h1/scene.xml"
+VIDEO_DIR = "./results/h1/"
+DATA_DIR = "./results/h1/"
 
+# README: run this file from the root of the repository: kuka_mujoco.
 
 # Instantiate the interpolator
 #target_q = np.array([0.0108746505, 0.409904735, -0.04571992, 0.363424591, 0.91689547, 0.164697949, 0.0099925136, -1.08606159, -3.05513108, 2.39996658, -1.58373738, -1.53605197, 0.357645804, -3.9112009, 1.06593459, -0.612316674, -1.70175744, -0.158552603, 0.316076873, 1.62802804, 0.393499762, -0.880202047, -1.0811211, -0.900504928, -0.569864469, -1.42788048])
@@ -145,7 +146,7 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30):
 if __name__ == "__main__":
 
     # Load the trajectory
-    traj = np.load("./traj.npy")
+    traj = np.load("./H1/traj.npy")
     #traj = np.concatenate([np.array([0.400]), target_q, target_vel]).reshape(1, 52)
     print(traj.shape)
 
@@ -192,13 +193,13 @@ if __name__ == "__main__":
         target_vel = traj[traj_index][27:52]
         logger.plot_columns(DATA_DIR+ f"qpos_iter{i}.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
         
-        # TODO: Solve the bugs in the plotting of other variables
+        # BUG. TODO: Solve the bugs in the plotting of other variables
         #logger.plot_columns(DATA_DIR+ f"ctrl_iter{i}.png", columns_names=[f"ctrl_{i}" for i in range(model.nv)], references = [0 for i in range(model.nv)])
 
         print("position error", target_q-data.qpos)
         print("velocity error", target_vel-data.qvel)
-    if renderer is not None:
-        renderer.close()
+    # if renderer is not None: # BUG renderer.close() crashes the program
+    #     renderer.close()
 
     # Save the video
     imageio.mimsave(os.path.join(VIDEO_DIR, "video.mp4"), frames, fps=framerate)
