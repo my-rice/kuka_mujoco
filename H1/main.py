@@ -25,7 +25,7 @@ class Solution:
     CONTROL_NOT_CLIP = 2
     Visualize = 3
 
-solution = Solution.Visualize
+solution = Solution.CONTROL_NOT_CLIP
 
 # Instantiate the interpolator
 #target_q = np.array([0.0108746505, 0.409904735, -0.04571992, 0.363424591, 0.91689547, 0.164697949, 0.0099925136, -1.08606159, -3.05513108, 2.39996658, -1.58373738, -1.53605197, 0.357645804, -3.9112009, 1.06593459, -0.612316674, -1.70175744, -0.158552603, 0.316076873, 1.62802804, 0.393499762, -0.880202047, -1.0811211, -0.900504928, -0.569864469, -1.42788048])
@@ -88,6 +88,10 @@ def run(model, data, renderer, logger, traj_element, frames, framerate=30, named
 
         else:
             
+            # Reset the control and the forces applied by the user.
+            data.qfrc_applied = np.zeros_like(data.qfrc_applied)
+            data.xfrc_applied = np.zeros_like(data.xfrc_applied)
+            data.ctrl = np.zeros_like(data.ctrl)
 
             prev_acc = data.qacc.copy()
             
@@ -208,10 +212,10 @@ if __name__ == "__main__":
         header += [f"ctrl_{i}" for i in range(model.na)]
 
     logger = Logger(DATA_DIR + "log.csv", header)
-    horizon = 5
+    horizon = 100
     n_steps = traj.shape[0]//horizon
 
-    n_steps = 1000
+    n_steps = 30
 
     # Reward
     reward_obj = WalkV5Easy(data)
@@ -232,14 +236,14 @@ if __name__ == "__main__":
         
         run(model, data, renderer, logger, traj[traj_index],frames, framerate=framerate,named=named)
         # Get the reward
-        robot.update(model,data)
-        reward += reward_obj.get_reward(robot, None, named)[0]
+        #robot.update(model,data)
+        #reward += reward_obj.get_reward(robot, None, named)[0]
         
         # Plot the qpos
         target_q = traj[traj_index][1:27]
         target_vel = traj[traj_index][27:52]
-        if solution != Solution.Visualize:
-            logger.plot_columns(DATA_DIR+ f"qpos_iter{i}.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
+        # if solution != Solution.Visualize:
+        #     logger.plot_columns(DATA_DIR+ f"qpos_iter{i}.png", columns_names=[f"qpos_{i}" for i in range(model.nq)], references = [target_q[i] for i in range(model.nq)])
         
         # BUG. TODO: Solve the bugs in the plotting of other variables
         #logger.plot_columns(DATA_DIR+ f"ctrl_iter{i}.png", columns_names=[f"ctrl_{i}" for i in range(model.nv)], references = [0 for i in range(model.nv)])
@@ -249,9 +253,9 @@ if __name__ == "__main__":
     # if renderer is not None: # BUG renderer.close() crashes the program
     #     renderer.close()
 
-    logger.plot_columns(DATA_DIR+ f"feet.png", columns_names=["left_foot_x", "left_foot_y", "left_foot_z", "right_foot_x", "right_foot_y", "right_foot_z","distance","distance_x"], references = None)
+    # logger.plot_columns(DATA_DIR+ f"feet.png", columns_names=["left_foot_x", "left_foot_y", "left_foot_z", "right_foot_x", "right_foot_y", "right_foot_z","distance","distance_x"], references = None)
 
-    print("reward", reward)    
+    # print("reward", reward)    
 
     # Save the video
     imageio.mimsave(os.path.join(VIDEO_DIR, "video.mp4"), frames, fps=framerate)
